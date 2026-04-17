@@ -50,21 +50,23 @@ export function getStartTime(appt) {
 // 'showed' | 'noshow' | 'cancelled' | 'confirmed' | 'invalid'
 export function outcomeLabel(status) {
   switch (status) {
-    case 'showed':    return 'Asistió'
-    case 'noshow':    return 'No-show'
-    case 'cancelled': return 'Cancelado'
-    case 'confirmed': return 'Confirmado'
-    default:          return status || 'Pendiente'
+    case 'showed':      return 'Show ✓'
+    case 'noshow':      return 'No Show'
+    case 'no_califica': return 'No califica'
+    case 'pending':     return 'Sin actualizar'
+    case 'confirmed':   return 'Confirmado'
+    default:            return status || 'Pendiente'
   }
 }
 
 export function outcomeStyle(status) {
   switch (status) {
-    case 'showed':    return 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-    case 'noshow':    return 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400'
-    case 'cancelled': return 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400'
-    case 'confirmed': return 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
-    default:          return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+    case 'showed':      return 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+    case 'noshow':      return 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400'
+    case 'no_califica': return 'bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400'
+    case 'pending':     return 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+    case 'confirmed':   return 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
+    default:            return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
   }
 }
 

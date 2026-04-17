@@ -78,7 +78,11 @@ export default function AppointmentRow({ appt, showOutcome = false }) {
 
       {/* CRM link */}
       <a
-        href={`https://app.gohighlevel.com/v2/location/${LOCATION_ID}/contacts/detail/${appt.contactId}`}
+        href={
+          appt.opportunityId
+            ? `https://app.gohighlevel.com/opportunities/${appt.opportunityId}`
+            : `https://app.gohighlevel.com/v2/location/${LOCATION_ID}/contacts/detail/${appt.contactId}`
+        }
         target="_blank"
         rel="noopener noreferrer"
         className="shrink-0 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"

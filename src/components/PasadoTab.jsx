@@ -30,13 +30,13 @@ export default function PasadoTab({ appointments, loading }) {
     return {
       filtered: result,
       showed:   result.filter(a => a.status === 'showed').length,
-      noshow:   result.filter(a => a.status === 'noshow' || a.status === 'cancelled').length,
+      noshow:   result.filter(a => a.status === 'noshow').length,
     }
   }, [appointments, filter])
 
   const rate = filtered.length > 0 ? Math.round((showed / filtered.length) * 100) : 0
 
-  const noshows    = filtered.filter(a => a.status === 'noshow' || a.status === 'cancelled')
+  const noshows    = filtered.filter(a => a.status === 'noshow')
   const showedList = filtered.filter(a => a.status === 'showed')
   const rest       = filtered.filter(a => a.status !== 'showed' && a.status !== 'noshow' && a.status !== 'cancelled')
 
