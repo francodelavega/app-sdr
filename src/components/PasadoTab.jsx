@@ -1,50 +1,50 @@
 import { useState, useMemo } from 'react'
-import { demoDate, demoOutcome } from '../hooks/useOpportunities'
-import OpportunityRow from './OpportunityRow'
+import { getStartTime } from '../hooks/useOpportunities'
+import AppointmentRow from './OpportunityRow'
 import LoadingSkeleton from './LoadingSkeleton'
 import EmptyState from './EmptyState'
 
 const FILTERS = [
-  { id: 'ayer',  label: 'Ayer',    days: 1  },
-  { id: '7d',    label: '7 días',  days: 7  },
-  { id: '14d',   label: '14 días', days: 14 },
-  { id: '21d',   label: '21 días', days: 21 },
+  { id: 'ayer', label: 'Ayer',    days: 1  },
+  { id: '7d',   label: '7 días',  days: 7  },
+  { id: '14d',  label: '14 días', days: 14 },
+  { id: '21d',  label: '21 días', days: 21 },
 ]
 
-export default function PasadoTab({ opportunities, loading }) {
+export default function PasadoTab({ appointments, loading }) {
   const [filter, setFilter] = useState('7d')
 
-  const { filtered, completed, cancelled } = useMemo(() => {
+  const { filtered, showed, noshow } = useMemo(() => {
     const now  = new Date()
     const days = FILTERS.find(f => f.id === filter)?.days || 7
     const from = new Date(now.getTime() - days * 86_400_000)
     from.setHours(0, 0, 0, 0)
 
-    const result = opportunities
-      .filter(opp => {
-        const d = demoDate(opp)
-        return d && d >= from && d <= now
+    const result = appointments
+      .filter(a => {
+        const d = getStartTime(a)
+        return d && d >= from && d < now
       })
-      .sort((a, b) => (demoDate(b)?.getTime() || 0) - (demoDate(a)?.getTime() || 0))
+      .sort((a, b) => new Date(b.startTime) - new Date(a.startTime))
 
-    const comp = result.filter(o => demoOutcome(o) === 'completed').length
-    const canc = result.filter(o => demoOutcome(o) === 'cancelled').length
+    return {
+      filtered: result,
+      showed:   result.filter(a => a.status === 'showed').length,
+      noshow:   result.filter(a => a.status === 'noshow' || a.status === 'cancelled').length,
+    }
+  }, [appointments, filter])
 
-    return { filtered: result, completed: comp, cancelled: canc }
-  }, [opportunities, filter])
+  const rate = filtered.length > 0 ? Math.round((showed / filtered.length) * 100) : 0
 
-  const convRate = filtered.length > 0
-    ? Math.round((completed / filtered.length) * 100)
-    : 0
+  const noshows    = filtered.filter(a => a.status === 'noshow' || a.status === 'cancelled')
+  const showedList = filtered.filter(a => a.status === 'showed')
+  const rest       = filtered.filter(a => a.status !== 'showed' && a.status !== 'noshow' && a.status !== 'cancelled')
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Filter row */}
       <div className="flex items-center gap-1.5 flex-wrap">
         {FILTERS.map(f => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
+          <button key={f.id} onClick={() => setFilter(f.id)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
               filter === f.id
                 ? 'bg-blue-500 text-white shadow-sm'
@@ -56,84 +56,63 @@ export default function PasadoTab({ opportunities, loading }) {
         ))}
       </div>
 
-      {/* Stats strip */}
       {!loading && filtered.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl bg-white dark:bg-navy-700 border border-slate-200 dark:border-slate-700 px-4 py-3">
-            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{completed}</p>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{showed}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Asistieron</p>
           </div>
           <div className="rounded-xl bg-white dark:bg-navy-700 border border-slate-200 dark:border-slate-700 px-4 py-3">
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400 tabular-nums">{cancelled}</p>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400 tabular-nums">{noshow}</p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">No-show / Cancelado</p>
           </div>
           <div className="rounded-xl bg-white dark:bg-navy-700 border border-slate-200 dark:border-slate-700 px-4 py-3">
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 tabular-nums">{convRate}%</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tasa de asistencia</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 tabular-nums">{rate}%</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Tasa asistencia</p>
           </div>
         </div>
       )}
 
-      {/* Section: cancelled first (re-engage focus) */}
-      {loading ? (
-        <LoadingSkeleton rows={6} />
-      ) : filtered.length === 0 ? (
-        <EmptyState message="No hay demos pasados en este período." />
+      {loading ? <LoadingSkeleton rows={6} /> : filtered.length === 0 ? (
+        <EmptyState message="No hay demos en este período." />
       ) : (
         <div className="space-y-4">
-          {/* No-shows — most actionable */}
-          {filtered.filter(o => demoOutcome(o) === 'cancelled').length > 0 && (
+          {noshows.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-red-500" />
                 <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  No-show / Cancelados
+                  No-show / Cancelados ({noshows.length})
                 </h3>
               </div>
               <div className="space-y-2">
-                {filtered
-                  .filter(o => demoOutcome(o) === 'cancelled')
-                  .map(opp => (
-                    <OpportunityRow key={opp.id} opp={opp} showOutcome />
-                  ))}
+                {noshows.map(a => <AppointmentRow key={a.id} appt={a} showOutcome />)}
               </div>
             </div>
           )}
-
-          {/* Completed */}
-          {filtered.filter(o => demoOutcome(o) === 'completed').length > 0 && (
+          {showedList.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  Completados
+                  Asistieron ({showedList.length})
                 </h3>
               </div>
               <div className="space-y-2">
-                {filtered
-                  .filter(o => demoOutcome(o) === 'completed')
-                  .map(opp => (
-                    <OpportunityRow key={opp.id} opp={opp} showOutcome />
-                  ))}
+                {showedList.map(a => <AppointmentRow key={a.id} appt={a} showOutcome />)}
               </div>
             </div>
           )}
-
-          {/* Pending outcome */}
-          {filtered.filter(o => demoOutcome(o) === 'pending').length > 0 && (
+          {rest.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-2 h-2 rounded-full bg-slate-400" />
                 <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  Sin resultado registrado
+                  Sin resultado ({rest.length})
                 </h3>
               </div>
               <div className="space-y-2">
-                {filtered
-                  .filter(o => demoOutcome(o) === 'pending')
-                  .map(opp => (
-                    <OpportunityRow key={opp.id} opp={opp} showOutcome />
-                  ))}
+                {rest.map(a => <AppointmentRow key={a.id} appt={a} showOutcome />)}
               </div>
             </div>
           )}

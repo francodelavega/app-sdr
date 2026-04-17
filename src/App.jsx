@@ -14,7 +14,7 @@ export default function App() {
   const { dark, toggle }                      = useTheme()
   const [user, setUser]                       = useState(undefined) // undefined = loading
   const [activeTab, setActiveTab]             = useState('proximos')
-  const { opportunities, loading, error, lastUpdated, refresh } = useOpportunities()
+  const { appointments, preDemoTotal, loading, error, lastUpdated, refresh } = useOpportunities()
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => {
@@ -70,17 +70,17 @@ export default function App() {
         )}
 
         {/* Summary cards — always visible */}
-        <SummaryCards opportunities={opportunities} loading={loading} />
+        <SummaryCards appointments={appointments} preDemoTotal={preDemoTotal} loading={loading} />
 
         {/* Tab content */}
         {activeTab === 'proximos' && (
-          <ProximosTab opportunities={opportunities} loading={loading} />
+          <ProximosTab appointments={appointments} loading={loading} />
         )}
         {activeTab === 'pasado' && (
-          <PasadoTab opportunities={opportunities} loading={loading} />
+          <PasadoTab appointments={appointments} loading={loading} />
         )}
         {activeTab === 'resumen' && (
-          <ResumenTab opportunities={opportunities} loading={loading} />
+          <ResumenTab appointments={appointments} preDemoTotal={preDemoTotal} loading={loading} />
         )}
       </main>
     </div>
