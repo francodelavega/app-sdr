@@ -18,8 +18,9 @@ export default function LoginPage() {
         }
       })
       .catch(e => {
-        if (e.code !== 'auth/cancelled-popup-request') {
-          setError('Error al iniciar sesión. Intenta nuevamente.')
+        const ignoredCodes = ['auth/cancelled-popup-request', 'auth/no-auth-event', 'auth/no-such-provider']
+        if (!ignoredCodes.includes(e.code)) {
+          setError(`Error: ${e.code || e.message}`)
         }
       })
       .finally(() => setLoading(false))
