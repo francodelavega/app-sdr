@@ -1,8 +1,7 @@
-const BASE      = 'https://services.leadconnectorhq.com'
-const TOKEN     = process.env.GHL_API_TOKEN
-const LOCATION  = process.env.GHL_LOCATION_ID
-const PIPELINE  = process.env.GHL_PIPELINE_ID   // MPUIAQq3Y5vZx8HZvvfC
-const VERSION   = '2021-07-28'
+const BASE     = 'https://services.leadconnectorhq.com'
+const TOKEN    = process.env.GHL_API_TOKEN
+const LOCATION = process.env.GHL_LOCATION_ID
+const VERSION  = '2021-07-28'
 
 const headers = {
   Authorization: `Bearer ${TOKEN}`,
@@ -16,13 +15,8 @@ async function ghl(path) {
   return res.json()
 }
 
-async function getPipelineStages(pipelineId) {
-  const data = await ghl(`/opportunities/pipelines/${pipelineId}?locationId=${LOCATION}`)
-  return data.stages || []
-}
-
 async function getOpportunitiesByStage(pipelineId, stageId) {
-  let all = []
+  let all  = []
   let page = 1
   while (true) {
     const data = await ghl(
@@ -41,35 +35,31 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   try {
-    // ── 1. Pipeline principal — stage "Pre-Demo" ───────────────────────────
-    const mainStages   = await getPipelineStages(PIPELINE)
-    const preDemoStage = mainStages.find(s =>
+    // Fetch all pipelines (stages included in response)
+    const { pipelines = [] } = await ghl(`/opportunities/pipelines?locationId=${LOCATION}`)
+
+    // ── Pipeline principal (1-PRINCIPAL) — stage PRE-DEMO ─────────────────
+    const mainPipeline  = pipelines.find(p => p.name.includes('PRINCIPAL') || p.id === 'MPUIAQq3Y5vZx8HZvvfC')
+    const preDemoStage  = mainPipeline?.stages?.find(s =>
       s.name.toLowerCase().includes('pre-demo') || s.name.toLowerCase().includes('pre demo')
     )
 
-    // ── 2. Pipeline "Webinar" — stage "Agendado" ───────────────────────────
-    const allPipelinesData = await ghl(`/opportunities/pipelines?locationId=${LOCATION}`)
-    const pipelines = allPipelinesData.pipelines || []
-    const webinarPipeline = pipelines.find(p =>
-      p.name.toLowerCase().includes('webinar')
+    // ── Pipeline Webinars (2-WEBINARS) — stage Agendado ───────────────────
+    const webinarPipeline = pipelines.find(p => p.name.toLowerCase().includes('webinar'))
+    const agendadoStage   = webinarPipeline?.stages?.find(s =>
+      s.name.toLowerCase().includes('agendado')
     )
 
     let opportunities = []
 
-    if (preDemoStage) {
-      const opps = await getOpportunitiesByStage(PIPELINE, preDemoStage.id)
+    if (mainPipeline && preDemoStage) {
+      const opps = await getOpportunitiesByStage(mainPipeline.id, preDemoStage.id)
       opportunities = opportunities.concat(opps.map(o => ({ ...o, _source: 'pre-demo' })))
     }
 
-    if (webinarPipeline) {
-      const webinarStages  = await getPipelineStages(webinarPipeline.id)
-      const agendadoStage  = webinarStages.find(s =>
-        s.name.toLowerCase().includes('agendado')
-      )
-      if (agendadoStage) {
-        const opps = await getOpportunitiesByStage(webinarPipeline.id, agendadoStage.id)
-        opportunities = opportunities.concat(opps.map(o => ({ ...o, _source: 'webinar' })))
-      }
+    if (webinarPipeline && agendadoStage) {
+      const opps = await getOpportunitiesByStage(webinarPipeline.id, agendadoStage.id)
+      opportunities = opportunities.concat(opps.map(o => ({ ...o, _source: 'webinar' })))
     }
 
     return res.status(200).json({ opportunities, fetchedAt: new Date().toISOString() })
