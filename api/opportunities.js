@@ -6,7 +6,6 @@ const VERSION  = '2021-07-28'
 const headers = {
   Authorization: `Bearer ${TOKEN}`,
   Version: VERSION,
-  'Content-Type': 'application/json',
 }
 
 async function ghl(path) {
