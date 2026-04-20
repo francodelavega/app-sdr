@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { signInWithRedirect, getRedirectResult } from 'firebase/auth'
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth'
 import { auth, googleProvider } from '../lib/firebase'
 
 export default function LoginPage() {
@@ -20,7 +20,7 @@ export default function LoginPage() {
       .catch(e => {
         const ignoredCodes = ['auth/cancelled-popup-request', 'auth/no-auth-event', 'auth/no-such-provider']
         if (!ignoredCodes.includes(e.code)) {
-          setError(`Error: ${e.code || e.message}`)
+          setError(`Error al iniciar sesión: ${e.code || e.message}`)
         }
       })
       .finally(() => setLoading(false))
@@ -30,10 +30,27 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      await signInWithRedirect(auth, googleProvider)
+      // Try popup first (more reliable); fall back to redirect if blocked
+      const result = await signInWithPopup(auth, googleProvider)
+      const email = result.user.email || ''
+      if (!email.endsWith('@wespeak.pro')) {
+        await auth.signOut()
+        setError(`Acceso denegado. Solo cuentas @wespeak.pro. (Intentaste con: ${email})`)
+        setLoading(false)
+      }
     } catch (e) {
-      setError('Error al iniciar sesión. Intenta nuevamente.')
-      setLoading(false)
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+        // Popup was blocked by browser → fall back to redirect
+        try {
+          await signInWithRedirect(auth, googleProvider)
+        } catch (e2) {
+          setError('Error al iniciar sesión. Intenta nuevamente.')
+          setLoading(false)
+        }
+      } else if (e.code !== 'auth/cancelled-popup-request') {
+        setError(`Error: ${e.code || e.message}`)
+        setLoading(false)
+      }
     }
   }
 
