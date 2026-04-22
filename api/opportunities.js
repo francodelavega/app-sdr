@@ -95,7 +95,8 @@ async function buildContactMap() {
           asistio = normalizeAsistio(cf?.fieldValueString) || 'pending'
         }
 
-        map[opp.contactId] = { asistio, oppId: opp.id, livesLost }
+        const stageName = stages.find(s => s.id === stageId)?.name || null
+        map[opp.contactId] = { asistio, oppId: opp.id, livesLost, stageName }
       }
     }
     processPage(firstAll)
@@ -169,6 +170,7 @@ export default async function handler(req, res) {
         endTime:          ev.endTime,
         status,
         livesLost:        oppData?.livesLost || 0,
+        stageName:        oppData?.stageName || null,
         calendarId:       ev.calendarId,
       })
     }

@@ -84,7 +84,7 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
         <div className="space-y-4">
           {active.length > 0 && (
             <div className="space-y-2">
-              {active.map(a => <AppointmentRow key={a.id} appt={a} showOutcome={false} livesLost={livesMap[a.contactId] || 0} />)}
+              {active.map(a => <AppointmentRow key={a.id} appt={a} showOutcome showStage livesLost={livesMap[a.contactId] || 0} />)}
             </div>
           )}
 
@@ -97,7 +97,7 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
                 </h3>
               </div>
               <div className="space-y-2 opacity-60">
-                {cancelled.map(a => <AppointmentRow key={a.id} appt={a} showOutcome livesLost={livesMap[a.contactId] || 0} />)}
+                {cancelled.map(a => <AppointmentRow key={a.id} appt={a} showOutcome showStage livesLost={livesMap[a.contactId] || 0} />)}
               </div>
             </div>
           )}
