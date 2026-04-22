@@ -11,7 +11,7 @@ const FILTERS = [
   { id: '7dias',  label: '7 días', days: 7    },
 ]
 
-export default function ProximosTab({ appointments, loading, jumpFilter }) {
+export default function ProximosTab({ appointments, loading, jumpFilter, livesMap = {} }) {
   const [filter, setFilter] = useState('7dias')
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function ProximosTab({ appointments, loading, jumpFilter }) {
         <div className="space-y-4">
           {active.length > 0 && (
             <div className="space-y-2">
-              {active.map(a => <AppointmentRow key={a.id} appt={a} showOutcome={false} />)}
+              {active.map(a => <AppointmentRow key={a.id} appt={a} showOutcome={false} livesLost={livesMap[a.contactId] || 0} />)}
             </div>
           )}
 
@@ -97,7 +97,7 @@ export default function ProximosTab({ appointments, loading, jumpFilter }) {
                 </h3>
               </div>
               <div className="space-y-2 opacity-60">
-                {cancelled.map(a => <AppointmentRow key={a.id} appt={a} showOutcome />)}
+                {cancelled.map(a => <AppointmentRow key={a.id} appt={a} showOutcome livesLost={livesMap[a.contactId] || 0} />)}
               </div>
             </div>
           )}

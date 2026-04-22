@@ -76,3 +76,16 @@ export function daysSince(dateStr) {
   if (!dateStr) return null
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000)
 }
+
+// Returns a map of contactId → number of past no-shows (lives lost)
+export function buildLivesMap(appointments) {
+  const map = {}
+  const now = new Date()
+  for (const a of appointments) {
+    if (!a.contactId) continue
+    if (new Date(a.startTime) < now && a.status === 'noshow') {
+      map[a.contactId] = (map[a.contactId] || 0) + 1
+    }
+  }
+  return map
+}

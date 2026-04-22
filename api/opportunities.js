@@ -119,7 +119,7 @@ export default async function handler(req, res) {
 
   try {
     const now     = Date.now()
-    const startMs = now - 21 * 24 * 60 * 60 * 1000  // 21 days ago
+    const startMs = now - 60 * 24 * 60 * 60 * 1000  // 60 days ago (captures multiple no-show cycles)
     const endMs   = now + 30 * 24 * 60 * 60 * 1000  // 30 days ahead
 
     const [evG, evB, evK, { map: contactMap, total: preDemoTotal }] = await Promise.all([
