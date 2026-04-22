@@ -77,15 +77,12 @@ export function daysSince(dateStr) {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000)
 }
 
-// Returns a map of contactId → number of past no-shows (lives lost)
+// Returns a map of contactId → livesLost (sourced from pipeline stage via API)
 export function buildLivesMap(appointments) {
   const map = {}
-  const now = new Date()
   for (const a of appointments) {
-    if (!a.contactId) continue
-    if (new Date(a.startTime) < now && a.status === 'noshow') {
-      map[a.contactId] = (map[a.contactId] || 0) + 1
-    }
+    if (!a.contactId || !a.livesLost) continue
+    map[a.contactId] = Math.max(map[a.contactId] || 0, a.livesLost)
   }
   return map
 }
