@@ -25,15 +25,29 @@ function fmt(d) {
   })
 }
 
+// Friendly label for pipeline stage name coming from GHL
+function stageLabel(stageName) {
+  if (!stageName) return null
+  const n = stageName.toUpperCase()
+  if (n.includes('PRE-DEMO') || n.includes('PRE DEMO')) return { label: 'Pre-Demo', color: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' }
+  if (n.includes('NO SHOW'))                              return { label: 'No Show', color: 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400' }
+  if (n.includes('DEMO') || n.includes('NUTRICI'))       return { label: 'Demo Nutrición', color: 'bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400' }
+  if (n.includes('DECISI'))                              return { label: 'Decisión', color: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' }
+  if (n.includes('NEGOCI'))                              return { label: 'Negociación', color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400' }
+  if (n.includes('PAGO'))                                return { label: 'Pago', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' }
+  return { label: stageName, color: 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400' }
+}
+
 const LOCATION_ID = 'KSLtWxOTnDay8qeue8df'
 
-export default function AppointmentRow({ appt, showOutcome = false, livesLost = 0 }) {
+export default function AppointmentRow({ appt, showOutcome = false, showStage = false, livesLost = 0 }) {
   const date      = getStartTime(appt)
   const dotColor  = colorFor(appt.comercial)
   const now       = new Date()
   const isPast    = date && date < now
   const isStale   = isPast && (appt.status === 'noshow' || appt.status === 'cancelled') &&
                     (now - date) > 3 * 86_400_000
+  const stage     = showStage ? stageLabel(appt.stageName) : null
 
   return (
     <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:shadow-md ${
@@ -44,7 +58,7 @@ export default function AppointmentRow({ appt, showOutcome = false, livesLost = 
       {/* Comercial dot */}
       <div className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
 
-      {/* Name */}
+      {/* Name + badges */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-slate-900 dark:text-white truncate">
@@ -66,6 +80,11 @@ export default function AppointmentRow({ appt, showOutcome = false, livesLost = 
             >
               <span className="text-base leading-none">💀</span>
               <span>{livesLost}</span>
+            </span>
+          )}
+          {stage && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${stage.color}`}>
+              {stage.label}
             </span>
           )}
         </div>

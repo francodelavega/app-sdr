@@ -110,7 +110,7 @@ export default function PasadoTab({ appointments, loading, jumpFilter, livesMap 
                 </h3>
               </div>
               <div className="space-y-2">
-                {noshows.map(a => <AppointmentRow key={a.id} appt={a} showOutcome livesLost={livesMap[a.contactId] || 0} />)}
+                {noshows.map(a => <AppointmentRow key={a.id} appt={a} showOutcome showStage livesLost={livesMap[a.contactId] || 0} />)}
               </div>
             </div>
           )}
@@ -123,7 +123,7 @@ export default function PasadoTab({ appointments, loading, jumpFilter, livesMap 
                 </h3>
               </div>
               <div className="space-y-2">
-                {showedList.map(a => <AppointmentRow key={a.id} appt={a} showOutcome livesLost={livesMap[a.contactId] || 0} />)}
+                {showedList.map(a => <AppointmentRow key={a.id} appt={a} showOutcome showStage livesLost={livesMap[a.contactId] || 0} />)}
               </div>
             </div>
           )}
@@ -136,7 +136,7 @@ export default function PasadoTab({ appointments, loading, jumpFilter, livesMap 
                 </h3>
               </div>
               <div className="space-y-2">
-                {rest.map(a => <AppointmentRow key={a.id} appt={a} showOutcome livesLost={livesMap[a.contactId] || 0} />)}
+                {rest.map(a => <AppointmentRow key={a.id} appt={a} showOutcome showStage livesLost={livesMap[a.contactId] || 0} />)}
               </div>
             </div>
           )}
