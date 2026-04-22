@@ -12,8 +12,10 @@ import ResumenTab from './components/ResumenTab'
 
 export default function App() {
   const { dark, toggle }                      = useTheme()
-  const [user, setUser]                       = useState(undefined) // undefined = loading
+  const [user, setUser]                       = useState(undefined)
   const [activeTab, setActiveTab]             = useState('proximos')
+  const [proximosFilter, setProximosFilter]   = useState(null)
+  const [pasadoFilter, setPasadoFilter]       = useState(null)
   const { appointments, preDemoTotal, loading, error, lastUpdated, refresh } = useOpportunities()
 
   useEffect(() => {
@@ -22,13 +24,25 @@ export default function App() {
         setUser(u)
       } else {
         setUser(null)
-        if (u) auth.signOut() // kick non-wespeak accounts
+        if (u) auth.signOut()
       }
     })
     return unsub
   }, [])
 
-  // ── Auth loading ──────────────────────────────────────────────────────────
+  function handleCardClick(cardId) {
+    if (cardId === 'today') {
+      setProximosFilter('hoy')
+      setActiveTab('proximos')
+    } else if (cardId === 'week') {
+      setProximosFilter('7dias')
+      setActiveTab('proximos')
+    } else if (cardId === 'noshow') {
+      setPasadoFilter('7d')
+      setActiveTab('pasado')
+    }
+  }
+
   if (user === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-navy-900">
@@ -51,7 +65,6 @@ export default function App() {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Error banner */}
         {error && (
           <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
@@ -69,15 +82,18 @@ export default function App() {
           </div>
         )}
 
-        {/* Summary cards — always visible */}
-        <SummaryCards appointments={appointments} preDemoTotal={preDemoTotal} loading={loading} />
+        <SummaryCards
+          appointments={appointments}
+          preDemoTotal={preDemoTotal}
+          loading={loading}
+          onCardClick={handleCardClick}
+        />
 
-        {/* Tab content */}
         {activeTab === 'proximos' && (
-          <ProximosTab appointments={appointments} loading={loading} />
+          <ProximosTab appointments={appointments} loading={loading} jumpFilter={proximosFilter} />
         )}
         {activeTab === 'pasado' && (
-          <PasadoTab appointments={appointments} loading={loading} />
+          <PasadoTab appointments={appointments} loading={loading} jumpFilter={pasadoFilter} />
         )}
         {activeTab === 'resumen' && (
           <ResumenTab appointments={appointments} preDemoTotal={preDemoTotal} loading={loading} />
