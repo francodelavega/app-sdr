@@ -81,8 +81,12 @@ async function buildContactMap() {
         let asistio
         const stageId = opp.pipelineStageId
 
+        // livesLost = 1 if contact is in NO SHOW stage (exactly 1 no-show, awaiting reschedule)
+        // The stage itself is the source of truth — don't count calendar events
+        let livesLost = 0
         if (stageId === noShowStg?.id) {
-          asistio = 'noshow'
+          asistio   = 'noshow'
+          livesLost = 1
         } else if (postDemoIds.has(stageId)) {
           asistio = 'showed'
         } else {
@@ -91,7 +95,7 @@ async function buildContactMap() {
           asistio = normalizeAsistio(cf?.fieldValueString) || 'pending'
         }
 
-        map[opp.contactId] = { asistio, oppId: opp.id }
+        map[opp.contactId] = { asistio, oppId: opp.id, livesLost }
       }
     }
     processPage(firstAll)
@@ -164,6 +168,7 @@ export default async function handler(req, res) {
         startTime:        ev.startTime,
         endTime:          ev.endTime,
         status,
+        livesLost:        oppData?.livesLost || 0,
         calendarId:       ev.calendarId,
       })
     }
