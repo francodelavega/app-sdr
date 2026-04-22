@@ -11,7 +11,7 @@ const FILTERS = [
   { id: '21d',  label: '21 días', days: 21 },
 ]
 
-export default function PasadoTab({ appointments, loading, jumpFilter }) {
+export default function PasadoTab({ appointments, loading, jumpFilter, livesMap = {} }) {
   const [filter, setFilter]   = useState('7d')
   const [sortDir, setSortDir] = useState('desc') // 'desc' = más reciente primero
 
@@ -110,7 +110,7 @@ export default function PasadoTab({ appointments, loading, jumpFilter }) {
                 </h3>
               </div>
               <div className="space-y-2">
-                {noshows.map(a => <AppointmentRow key={a.id} appt={a} showOutcome />)}
+                {noshows.map(a => <AppointmentRow key={a.id} appt={a} showOutcome livesLost={livesMap[a.contactId] || 0} />)}
               </div>
             </div>
           )}
@@ -123,7 +123,7 @@ export default function PasadoTab({ appointments, loading, jumpFilter }) {
                 </h3>
               </div>
               <div className="space-y-2">
-                {showedList.map(a => <AppointmentRow key={a.id} appt={a} showOutcome />)}
+                {showedList.map(a => <AppointmentRow key={a.id} appt={a} showOutcome livesLost={livesMap[a.contactId] || 0} />)}
               </div>
             </div>
           )}
@@ -136,7 +136,7 @@ export default function PasadoTab({ appointments, loading, jumpFilter }) {
                 </h3>
               </div>
               <div className="space-y-2">
-                {rest.map(a => <AppointmentRow key={a.id} appt={a} showOutcome />)}
+                {rest.map(a => <AppointmentRow key={a.id} appt={a} showOutcome livesLost={livesMap[a.contactId] || 0} />)}
               </div>
             </div>
           )}

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from './lib/firebase'
 import { useTheme } from './hooks/useTheme'
-import { useOpportunities } from './hooks/useOpportunities'
+import { useOpportunities, buildLivesMap } from './hooks/useOpportunities'
 import LoginPage from './components/LoginPage'
 import Navbar from './components/Navbar'
 import SummaryCards from './components/SummaryCards'
@@ -17,6 +17,8 @@ export default function App() {
   const [proximosFilter, setProximosFilter]   = useState(null)
   const [pasadoFilter, setPasadoFilter]       = useState(null)
   const { appointments, preDemoTotal, loading, error, lastUpdated, refresh } = useOpportunities()
+
+  const livesMap = useMemo(() => buildLivesMap(appointments), [appointments])
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => {
@@ -90,10 +92,10 @@ export default function App() {
         />
 
         {activeTab === 'proximos' && (
-          <ProximosTab appointments={appointments} loading={loading} jumpFilter={proximosFilter} />
+          <ProximosTab appointments={appointments} loading={loading} jumpFilter={proximosFilter} livesMap={livesMap} />
         )}
         {activeTab === 'pasado' && (
-          <PasadoTab appointments={appointments} loading={loading} jumpFilter={pasadoFilter} />
+          <PasadoTab appointments={appointments} loading={loading} jumpFilter={pasadoFilter} livesMap={livesMap} />
         )}
         {activeTab === 'resumen' && (
           <ResumenTab appointments={appointments} preDemoTotal={preDemoTotal} loading={loading} />

@@ -27,7 +27,7 @@ function fmt(d) {
 
 const LOCATION_ID = 'KSLtWxOTnDay8qeue8df'
 
-export default function AppointmentRow({ appt, showOutcome = false }) {
+export default function AppointmentRow({ appt, showOutcome = false, livesLost = 0 }) {
   const date      = getStartTime(appt)
   const dotColor  = colorFor(appt.comercial)
   const now       = new Date()
@@ -53,6 +53,18 @@ export default function AppointmentRow({ appt, showOutcome = false }) {
           {isStale && (
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0">
               Seguimiento
+            </span>
+          )}
+          {livesLost > 0 && (
+            <span
+              title={`${livesLost} no-show${livesLost > 1 ? 's' : ''} anterior${livesLost > 1 ? 'es' : ''}`}
+              className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                livesLost >= 2
+                  ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                  : 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400'
+              }`}
+            >
+              💀 {livesLost}
             </span>
           )}
         </div>
