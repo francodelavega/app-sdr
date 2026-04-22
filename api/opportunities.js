@@ -10,14 +10,13 @@ const USERS = {
   yN99V1eTdEXfj0eBB3b6: 'Karen',
 }
 
-// Normalize ¿Asistió? value to a standard status
 function normalizeAsistio(val) {
-  if (!val) return 'pending'
+  if (!val) return null
   const v = val.toLowerCase()
-  if (v === 'show')                                    return 'showed'
-  if (v === 'no show' || v === 'no contesto')         return 'noshow'
-  if (v === 'no califica')                             return 'no_califica'
-  return 'pending'
+  if (v === 'show')                              return 'showed'
+  if (v === 'no show' || v === 'no contesto')   return 'noshow'
+  if (v === 'no califica')                       return 'no_califica'
+  return null
 }
 
 const HEADERS = { Authorization: `Bearer ${TOKEN}`, Version: VERSION }
@@ -35,42 +34,73 @@ async function fetchEventsForUser(userId, startMs, endMs) {
   return data.events || []
 }
 
-// Build contactId -> { asistio, oppId } map from all Pre-Demo opportunities
+// Build contactId -> { asistio, oppId } map from ALL stages of the pipeline.
+// Status is determined by pipeline stage (most reliable), with ¿Asistió? field as fallback.
+//
+// Stage logic:
+//   NO SHOW stage          → noshow (contact was moved here after not attending)
+//   DEMO|NUTRICIÓN+ stages → showed (contact attended and advanced in pipeline)
+//   PRE-DEMO stage         → use ¿Asistió? field; if empty → pending (demo not yet occurred or not updated)
 async function buildContactMap() {
   const map = {}
-  let total = 0
+  let preDemoTotal = 0
 
   try {
     const { pipelines = [] } = await ghl(`/opportunities/pipelines?locationId=${LOCATION}`)
-    const main       = pipelines.find(p => p.id === 'MPUIAQq3Y5vZx8HZvvfC' || p.name.includes('PRINCIPAL'))
-    const preDemoStg = main?.stages?.find(s => s.name.toUpperCase().includes('PRE-DEMO'))
-    if (!main || !preDemoStg) return { map, total }
+    const main = pipelines.find(p => p.id === 'MPUIAQq3Y5vZx8HZvvfC' || p.name.includes('PRINCIPAL'))
+    if (!main) return { map, total: 0 }
 
-    // First page to get total count — only OPEN opportunities
-    const first = await ghl(
-      `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&pipeline_stage_id=${preDemoStg.id}&status=open&limit=100&page=1`
+    const stages       = main.stages || []
+    const preDemoStg   = stages.find(s => s.name.toUpperCase().includes('PRE-DEMO'))
+    const noShowStg    = stages.find(s => s.name.toUpperCase().includes('NO SHOW'))
+    // Any stage after PRE-DEMO (excluding NO SHOW) means the contact attended
+    const preDemoIdx   = stages.findIndex(s => s.id === preDemoStg?.id)
+    const postDemoIds  = new Set(
+      stages
+        .filter((s, i) => i > preDemoIdx && s.id !== noShowStg?.id)
+        .map(s => s.id)
     )
-    total = first.meta?.total || 0
-    const pages = Math.ceil(total / 100)
+
+    // Count only open PRE-DEMO opps for the summary card total
+    const countRes = await ghl(
+      `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&pipeline_stage_id=${preDemoStg.id}&status=open&limit=1&page=1`
+    )
+    preDemoTotal = countRes.meta?.total || 0
+
+    // Fetch ALL open opportunities from ALL stages to build the contact→outcome map
+    const firstAll = await ghl(
+      `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&status=open&limit=100&page=1`
+    )
+    const totalAll = firstAll.meta?.total || 0
+    const pagesAll = Math.ceil(totalAll / 100)
 
     const processPage = (data) => {
       for (const opp of data.opportunities || []) {
         if (!opp.contactId) continue
-        const cf = (opp.customFields || []).find(f => f.id === ASISTIO_FIELD)
-        map[opp.contactId] = {
-          asistio: normalizeAsistio(cf?.fieldValueString),
-          oppId:   opp.id,
+
+        let asistio
+        const stageId = opp.pipelineStageId
+
+        if (stageId === noShowStg?.id) {
+          asistio = 'noshow'
+        } else if (postDemoIds.has(stageId)) {
+          asistio = 'showed'
+        } else {
+          // Still in PRE-DEMO: use the ¿Asistió? custom field
+          const cf = (opp.customFields || []).find(f => f.id === ASISTIO_FIELD)
+          asistio = normalizeAsistio(cf?.fieldValueString) || 'pending'
         }
+
+        map[opp.contactId] = { asistio, oppId: opp.id }
       }
     }
-    processPage(first)
+    processPage(firstAll)
 
-    // Fetch remaining pages in parallel batches of 5
-    for (let start = 2; start <= pages; start += 5) {
+    for (let start = 2; start <= pagesAll; start += 5) {
       const batch = []
-      for (let p = start; p < start + 5 && p <= pages; p++) {
+      for (let p = start; p < start + 5 && p <= pagesAll; p++) {
         batch.push(ghl(
-          `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&pipeline_stage_id=${preDemoStg.id}&status=open&limit=100&page=${p}`
+          `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&status=open&limit=100&page=${p}`
         ))
       }
       const results = await Promise.all(batch)
@@ -80,7 +110,7 @@ async function buildContactMap() {
     console.error('buildContactMap error:', e.message)
   }
 
-  return { map, total }
+  return { map, total: preDemoTotal }
 }
 
 export default async function handler(req, res) {
@@ -92,7 +122,6 @@ export default async function handler(req, res) {
     const startMs = now - 21 * 24 * 60 * 60 * 1000  // 21 days ago
     const endMs   = now + 30 * 24 * 60 * 60 * 1000  // 30 days ahead
 
-    // Fetch calendar events + contact map in parallel
     const [evG, evB, evK, { map: contactMap, total: preDemoTotal }] = await Promise.all([
       fetchEventsForUser('ilk9PnMA0JIoGXemoT9W', startMs, endMs),
       fetchEventsForUser('pahPHNuQSroyY1TyTn2p', startMs, endMs),
@@ -100,42 +129,42 @@ export default async function handler(req, res) {
       buildContactMap(),
     ])
 
-    // Deduplicate, enrich with ¿Asistió? from opportunity
-    const seen = new Set()
+    const seen     = new Set()
     const appointments = []
-    const nowDate = new Date()
+    const nowDate  = new Date()
 
     for (const ev of [...evG, ...evB, ...evK]) {
       if (seen.has(ev.id) || ev.deleted) continue
       seen.add(ev.id)
 
-      const isPast        = new Date(ev.startTime) < nowDate
-      const oppData       = contactMap[ev.contactId]
-      const apptStatus    = (ev.appointmentStatus || '').toLowerCase()
-      const isCancelled   = apptStatus === 'cancelled' || apptStatus === 'invalid'
+      const isPast   = new Date(ev.startTime) < nowDate
+      const oppData  = contactMap[ev.contactId]
+      const apptSt   = (ev.appointmentStatus || '').toLowerCase()
 
-      // Determine status:
-      // - Cancelled by GHL → 'cancelled' (regardless of past/future)
-      // - Future (not cancelled) → 'confirmed'
-      // - Past (not cancelled) → use ¿Asistió? field if set, otherwise 'pending'
-      let status = 'confirmed'
-      if (isCancelled) {
-        status = 'cancelled'
-      } else if (isPast) {
+      // Status logic:
+      // - Past appointment → use pipeline stage (via contactMap). If contact not in map → pending.
+      // - Future appointment:
+      //     cancelled/invalid → 'cancelled' (actually cancelled, not just rescheduled)
+      //     otherwise         → 'confirmed'
+      // Note: appointmentStatus='cancelled' on past events usually means rescheduled,
+      //       so we IGNORE it for past events and trust the pipeline stage instead.
+      let status
+      if (isPast) {
         status = oppData?.asistio || 'pending'
+      } else {
+        status = (apptSt === 'cancelled' || apptSt === 'invalid') ? 'cancelled' : 'confirmed'
       }
 
       appointments.push({
-        id:             ev.id,
-        contactId:      ev.contactId,
-        opportunityId:  oppData?.oppId || null,
-        contactName:    (ev.title || '').replace(/\s*\|\s*WeSpeak.*$/i, '').trim() || 'Sin nombre',
-        comercial:      USERS[ev.assignedUserId] || 'Otro',
-        startTime:      ev.startTime,
-        endTime:        ev.endTime,
+        id:               ev.id,
+        contactId:        ev.contactId,
+        opportunityId:    oppData?.oppId || null,
+        contactName:      (ev.title || '').replace(/\s*\|\s*WeSpeak.*$/i, '').trim() || 'Sin nombre',
+        comercial:        USERS[ev.assignedUserId] || 'Otro',
+        startTime:        ev.startTime,
+        endTime:          ev.endTime,
         status,
-        appointmentStatus: ev.appointmentStatus || null,
-        calendarId:     ev.calendarId,
+        calendarId:       ev.calendarId,
       })
     }
 
