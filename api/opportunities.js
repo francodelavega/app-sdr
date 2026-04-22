@@ -46,9 +46,9 @@ async function buildContactMap() {
     const preDemoStg = main?.stages?.find(s => s.name.toUpperCase().includes('PRE-DEMO'))
     if (!main || !preDemoStg) return { map, total }
 
-    // First page to get total count
+    // First page to get total count — only OPEN opportunities
     const first = await ghl(
-      `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&pipeline_stage_id=${preDemoStg.id}&limit=100&page=1`
+      `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&pipeline_stage_id=${preDemoStg.id}&status=open&limit=100&page=1`
     )
     total = first.meta?.total || 0
     const pages = Math.ceil(total / 100)
@@ -70,7 +70,7 @@ async function buildContactMap() {
       const batch = []
       for (let p = start; p < start + 5 && p <= pages; p++) {
         batch.push(ghl(
-          `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&pipeline_stage_id=${preDemoStg.id}&limit=100&page=${p}`
+          `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&pipeline_stage_id=${preDemoStg.id}&status=open&limit=100&page=${p}`
         ))
       }
       const results = await Promise.all(batch)
@@ -109,27 +109,33 @@ export default async function handler(req, res) {
       if (seen.has(ev.id) || ev.deleted) continue
       seen.add(ev.id)
 
-      const isPast   = new Date(ev.startTime) < nowDate
-      const oppData  = contactMap[ev.contactId]
+      const isPast        = new Date(ev.startTime) < nowDate
+      const oppData       = contactMap[ev.contactId]
+      const apptStatus    = (ev.appointmentStatus || '').toLowerCase()
+      const isCancelled   = apptStatus === 'cancelled' || apptStatus === 'invalid'
 
       // Determine status:
-      // - Future → always 'confirmed'
-      // - Past → use ¿Asistió? field if set, otherwise 'pending'
+      // - Cancelled by GHL → 'cancelled' (regardless of past/future)
+      // - Future (not cancelled) → 'confirmed'
+      // - Past (not cancelled) → use ¿Asistió? field if set, otherwise 'pending'
       let status = 'confirmed'
-      if (isPast) {
+      if (isCancelled) {
+        status = 'cancelled'
+      } else if (isPast) {
         status = oppData?.asistio || 'pending'
       }
 
       appointments.push({
-        id:          ev.id,
-        contactId:   ev.contactId,
-        opportunityId: oppData?.oppId || null,
-        contactName: (ev.title || '').replace(/\s*\|\s*WeSpeak.*$/i, '').trim() || 'Sin nombre',
-        comercial:   USERS[ev.assignedUserId] || 'Otro',
-        startTime:   ev.startTime,
-        endTime:     ev.endTime,
+        id:             ev.id,
+        contactId:      ev.contactId,
+        opportunityId:  oppData?.oppId || null,
+        contactName:    (ev.title || '').replace(/\s*\|\s*WeSpeak.*$/i, '').trim() || 'Sin nombre',
+        comercial:      USERS[ev.assignedUserId] || 'Otro',
+        startTime:      ev.startTime,
+        endTime:        ev.endTime,
         status,
-        calendarId:  ev.calendarId,
+        appointmentStatus: ev.appointmentStatus || null,
+        calendarId:     ev.calendarId,
       })
     }
 

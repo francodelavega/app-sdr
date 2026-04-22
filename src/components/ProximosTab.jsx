@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { getStartTime } from '../hooks/useOpportunities'
 import AppointmentRow from './OpportunityRow'
 import LoadingSkeleton from './LoadingSkeleton'
@@ -11,11 +11,14 @@ const FILTERS = [
   { id: '7dias',  label: '7 días', days: 7    },
 ]
 
-export default function ProximosTab({ appointments, loading }) {
-  const [filter, setFilter]       = useState('7dias')
-  const [sortStale, setSortStale] = useState(false)
+export default function ProximosTab({ appointments, loading, jumpFilter }) {
+  const [filter, setFilter] = useState('7dias')
 
-  const filtered = useMemo(() => {
+  useEffect(() => {
+    if (jumpFilter) setFilter(jumpFilter)
+  }, [jumpFilter])
+
+  const { active, cancelled } = useMemo(() => {
     const now = new Date()
 
     let from, to
@@ -31,15 +34,20 @@ export default function ProximosTab({ appointments, loading }) {
       to   = new Date(now.getTime() + days * 86_400_000)
     }
 
-    const result = appointments.filter(a => {
+    const inRange = appointments.filter(a => {
       const d = getStartTime(a)
-      return d && d >= from && d <= to && a.status !== 'cancelled' && a.status !== 'noshow'
+      return d && d >= from && d <= to
     })
 
-    return sortStale
-      ? [...result].sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
-      : [...result].sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
-  }, [appointments, filter, sortStale])
+    return {
+      active:    inRange.filter(a => a.status !== 'cancelled' && a.status !== 'noshow')
+                        .sort((a, b) => new Date(a.startTime) - new Date(b.startTime)),
+      cancelled: inRange.filter(a => a.status === 'cancelled')
+                        .sort((a, b) => new Date(a.startTime) - new Date(b.startTime)),
+    }
+  }, [appointments, filter])
+
+  const total = active.length + cancelled.length
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -61,15 +69,38 @@ export default function ProximosTab({ appointments, loading }) {
 
       {!loading && (
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          {filtered.length} demo{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
+          {active.length} demo{active.length !== 1 ? 's' : ''} confirmado{active.length !== 1 ? 's' : ''}
+          {cancelled.length > 0 && (
+            <span className="ml-2 text-slate-400 dark:text-slate-500">
+              · {cancelled.length} cancelado{cancelled.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </p>
       )}
 
-      {loading ? <LoadingSkeleton rows={6} /> : filtered.length === 0 ? (
+      {loading ? <LoadingSkeleton rows={6} /> : total === 0 ? (
         <EmptyState message="No hay demos agendados en este período." />
       ) : (
-        <div className="space-y-2">
-          {filtered.map(a => <AppointmentRow key={a.id} appt={a} showOutcome={false} />)}
+        <div className="space-y-4">
+          {active.length > 0 && (
+            <div className="space-y-2">
+              {active.map(a => <AppointmentRow key={a.id} appt={a} showOutcome={false} />)}
+            </div>
+          )}
+
+          {cancelled.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2 mt-2">
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                  Cancelados ({cancelled.length})
+                </h3>
+              </div>
+              <div className="space-y-2 opacity-60">
+                {cancelled.map(a => <AppointmentRow key={a.id} appt={a} showOutcome />)}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
