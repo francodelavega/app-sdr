@@ -31,10 +31,15 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
   })
   const [pipelineFilter, setPipelineFilter] = useState('all')
 
+  // Friendly label: strip leading "N-" prefix from GHL pipeline names
+  function friendlyLabel(name) {
+    return name.replace(/^\d+-/i, '').replace(/_/g, ' ')
+  }
+
   // Compute available pipelines from actual data
   const pipelineOptions = useMemo(() => {
-    const names = [...new Set(appointments.map(a => a.pipeline).filter(Boolean))]
-    return [{ id: 'all', label: 'Todos' }, ...names.map(n => ({ id: n, label: n }))]
+    const names = [...new Set(appointments.map(a => a.pipeline).filter(Boolean))].sort()
+    return [{ id: 'all', label: 'Todos' }, ...names.map(n => ({ id: n, label: friendlyLabel(n) }))]
   }, [appointments])
 
   // jumpFilter compatibility: 'hoy' → today, '7dias' → today
@@ -77,7 +82,7 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
       cancelled: inRange.filter(a => a.status === 'cancelled')
                         .sort((a, b) => new Date(a.startTime) - new Date(b.startTime)),
     }
-  }, [appointments, selectedDay])
+  }, [filteredByPipeline, selectedDay])
 
   // Count appointments per day for dot indicators
   const countByDay = useMemo(() => {
@@ -91,7 +96,7 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
       else map[key].active++
     }
     return map
-  }, [appointments])
+  }, [filteredByPipeline])
 
   function countForDay(d) {
     return countByDay[`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`] || { active: 0, cancelled: 0 }
