@@ -37,11 +37,12 @@ export default function NextDemoCountdown({ appointments }) {
     const nowDate = new Date(now)
     const active  = appointments.filter(a => a.status !== 'cancelled')
 
-    // Demo currently in progress
+    // Demo currently in progress (assume 60 min if no endTime)
     const inProg = active.find(a => {
       const start = getStartTime(a)
-      const end   = a.endTime ? new Date(a.endTime) : null
-      return start && start <= nowDate && end && end > nowDate
+      if (!start || start > nowDate) return false
+      const end = a.endTime ? new Date(a.endTime) : new Date(start.getTime() + 60 * 60 * 1000)
+      return end > nowDate
     })
     if (inProg) return { next: inProg, inProgress: true }
 
