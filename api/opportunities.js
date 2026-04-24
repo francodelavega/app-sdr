@@ -147,13 +147,15 @@ export default async function handler(req, res) {
       // - Future appointment:
       //     cancelled/invalid → 'cancelled' (actually cancelled, not just rescheduled)
       //     otherwise         → 'confirmed'
-      // Note: appointmentStatus='cancelled' on past events usually means rescheduled,
-      //       so we IGNORE it for past events and trust the pipeline stage instead.
       let status
-      if (isPast) {
+      if (apptSt === 'cancelled' || apptSt === 'invalid') {
+        // Calendar says cancelled → always cancelled, past or future
+        status = 'cancelled'
+      } else if (isPast) {
+        // Past and not cancelled → read ¿Asistió? field from CRM
         status = oppData?.asistio || 'pending'
       } else {
-        status = (apptSt === 'cancelled' || apptSt === 'invalid') ? 'cancelled' : 'confirmed'
+        status = 'confirmed'
       }
 
       appointments.push({
