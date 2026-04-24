@@ -6,9 +6,12 @@ import EmptyState from './EmptyState'
 
 const FILTERS = [
   { id: 'ayer', label: 'Ayer',    days: 1  },
-  { id: '7d',   label: '7 días',  days: 7  },
-  { id: '14d',  label: '14 días', days: 14 },
-  { id: '21d',  label: '21 días', days: 21 },
+  { id: '7d',   label: '7d',     days: 7  },
+  { id: '14d',  label: '14d',    days: 14 },
+  { id: '21d',  label: '21d',    days: 21 },
+  { id: '28d',  label: '28d',    days: 28 },
+  { id: '35d',  label: '35d',    days: 35 },
+  { id: '42d',  label: '42d',    days: 42 },
 ]
 
 export default function PasadoTab({ appointments, loading, jumpFilter, livesMap = {} }) {

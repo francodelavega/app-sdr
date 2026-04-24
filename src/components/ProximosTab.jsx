@@ -23,12 +23,19 @@ function isSameDay(a, b) {
          a.getDate() === b.getDate()
 }
 
+const PIPELINE_FILTERS = [
+  { id: 'all',       label: 'Todos'     },
+  { id: 'principal', label: 'Principal' },
+  { id: 'webinar',   label: 'Webinar'   },
+]
+
 export default function ProximosTab({ appointments, loading, jumpFilter, livesMap = {} }) {
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d }, [])
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [selectedDay, setSelectedDay] = useState(() => {
     const d = new Date(); d.setHours(0,0,0,0); return d
   })
+  const [pipelineFilter, setPipelineFilter] = useState('all')
 
   // jumpFilter compatibility: 'hoy' → today, '7dias' → today
   useEffect(() => {
@@ -48,12 +55,18 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
     })
   }, [weekStart])
 
+  const filteredByPipeline = useMemo(() =>
+    pipelineFilter === 'all'
+      ? appointments
+      : appointments.filter(a => a.pipeline === pipelineFilter),
+  [appointments, pipelineFilter])
+
   const { active, cancelled } = useMemo(() => {
     const from = new Date(selectedDay)
     const to   = new Date(selectedDay)
     to.setHours(23, 59, 59, 999)
 
-    const inRange = appointments.filter(a => {
+    const inRange = filteredByPipeline.filter(a => {
       const d = getStartTime(a)
       return d && d >= from && d <= to
     })
@@ -69,7 +82,7 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
   // Count appointments per day for dot indicators
   const countByDay = useMemo(() => {
     const map = {}
-    for (const a of appointments) {
+    for (const a of filteredByPipeline) {
       const d = getStartTime(a)
       if (!d) continue
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
@@ -92,6 +105,21 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
 
   return (
     <div className="space-y-4 animate-fade-in">
+      {/* Pipeline filter */}
+      <div className="flex items-center gap-1.5">
+        {PIPELINE_FILTERS.map(f => (
+          <button key={f.id} onClick={() => setPipelineFilter(f.id)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              pipelineFilter === f.id
+                ? 'bg-blue-500 text-white shadow-sm'
+                : 'bg-white dark:bg-navy-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-600'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* Week navigator */}
       <div className="bg-white dark:bg-navy-700 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
         <div className="flex items-center justify-between mb-3">

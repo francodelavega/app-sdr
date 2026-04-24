@@ -34,82 +34,87 @@ async function fetchEventsForUser(userId, startMs, endMs) {
   return data.events || []
 }
 
-// Build contactId -> { asistio, oppId } map from ALL stages of the pipeline.
-// Status is determined by pipeline stage (most reliable), with ¿Asistió? field as fallback.
-//
-// Stage logic:
-//   NO SHOW stage          → noshow (contact was moved here after not attending)
-//   DEMO|NUTRICIÓN+ stages → showed (contact attended and advanced in pipeline)
-//   PRE-DEMO stage         → use ¿Asistió? field; if empty → pending (demo not yet occurred or not updated)
+// Build contactId -> { asistio, oppId, livesLost, stageName, pipeline } map.
+// Processes both PRINCIPAL and WEBINAR pipelines.
+// Stage logic per pipeline:
+//   NO SHOW stage          → noshow
+//   post-PRE-DEMO stages   → showed
+//   PRE-DEMO stage         → ¿Asistió? field or 'pending'
+async function processPipeline(pipeline, map, pipelineLabel) {
+  const stages      = pipeline.stages || []
+  const preDemoStg  = stages.find(s => s.name.toUpperCase().includes('PRE-DEMO'))
+  const noShowStg   = stages.find(s => s.name.toUpperCase().includes('NO SHOW'))
+  const preDemoIdx  = stages.findIndex(s => s.id === preDemoStg?.id)
+  const postDemoIds = new Set(
+    stages
+      .filter((s, i) => i > preDemoIdx && s.id !== noShowStg?.id)
+      .map(s => s.id)
+  )
+
+  const processPage = (data) => {
+    for (const opp of data.opportunities || []) {
+      if (!opp.contactId) continue
+      const stageId = opp.pipelineStageId
+      let asistio, livesLost = 0
+
+      if (stageId === noShowStg?.id) {
+        asistio   = 'noshow'
+        livesLost = 1
+      } else if (postDemoIds.has(stageId)) {
+        asistio = 'showed'
+      } else {
+        const cf = (opp.customFields || []).find(f => f.id === ASISTIO_FIELD)
+        asistio = normalizeAsistio(cf?.fieldValueString) || 'pending'
+      }
+
+      const stageName = stages.find(s => s.id === stageId)?.name || null
+      map[opp.contactId] = { asistio, oppId: opp.id, livesLost, stageName, pipeline: pipelineLabel }
+    }
+  }
+
+  const first = await ghl(
+    `/opportunities/search?location_id=${LOCATION}&pipeline_id=${pipeline.id}&status=open&limit=100&page=1`
+  )
+  processPage(first)
+  const pages = Math.ceil((first.meta?.total || 0) / 100)
+
+  for (let start = 2; start <= pages; start += 5) {
+    const batch = []
+    for (let p = start; p < start + 5 && p <= pages; p++) {
+      batch.push(ghl(
+        `/opportunities/search?location_id=${LOCATION}&pipeline_id=${pipeline.id}&status=open&limit=100&page=${p}`
+      ))
+    }
+    const results = await Promise.all(batch)
+    results.forEach(processPage)
+  }
+
+  return first.meta?.total || 0
+}
+
 async function buildContactMap() {
   const map = {}
   let preDemoTotal = 0
 
   try {
     const { pipelines = [] } = await ghl(`/opportunities/pipelines?locationId=${LOCATION}`)
-    const main = pipelines.find(p => p.id === 'MPUIAQq3Y5vZx8HZvvfC' || p.name.includes('PRINCIPAL'))
-    if (!main) return { map, total: 0 }
+    const main    = pipelines.find(p => p.id === 'MPUIAQq3Y5vZx8HZvvfC' || p.name.toUpperCase().includes('PRINCIPAL'))
+    const webinar = pipelines.find(p => p.name.toUpperCase().includes('WEBINAR'))
 
-    const stages       = main.stages || []
-    const preDemoStg   = stages.find(s => s.name.toUpperCase().includes('PRE-DEMO'))
-    const noShowStg    = stages.find(s => s.name.toUpperCase().includes('NO SHOW'))
-    // Any stage after PRE-DEMO (excluding NO SHOW) means the contact attended
-    const preDemoIdx   = stages.findIndex(s => s.id === preDemoStg?.id)
-    const postDemoIds  = new Set(
-      stages
-        .filter((s, i) => i > preDemoIdx && s.id !== noShowStg?.id)
-        .map(s => s.id)
-    )
+    const tasks = []
+    if (main)    tasks.push(processPipeline(main,    map, 'principal'))
+    if (webinar) tasks.push(processPipeline(webinar, map, 'webinar'))
+    await Promise.all(tasks)
 
-    // Count only open PRE-DEMO opps for the summary card total
-    const countRes = await ghl(
-      `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&pipeline_stage_id=${preDemoStg.id}&status=open&limit=1&page=1`
-    )
-    preDemoTotal = countRes.meta?.total || 0
-
-    // Fetch ALL open opportunities from ALL stages to build the contact→outcome map
-    const firstAll = await ghl(
-      `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&status=open&limit=100&page=1`
-    )
-    const totalAll = firstAll.meta?.total || 0
-    const pagesAll = Math.ceil(totalAll / 100)
-
-    const processPage = (data) => {
-      for (const opp of data.opportunities || []) {
-        if (!opp.contactId) continue
-
-        let asistio
-        const stageId = opp.pipelineStageId
-
-        // livesLost = 1 if contact is in NO SHOW stage (exactly 1 no-show, awaiting reschedule)
-        // The stage itself is the source of truth — don't count calendar events
-        let livesLost = 0
-        if (stageId === noShowStg?.id) {
-          asistio   = 'noshow'
-          livesLost = 1
-        } else if (postDemoIds.has(stageId)) {
-          asistio = 'showed'
-        } else {
-          // Still in PRE-DEMO: use the ¿Asistió? custom field
-          const cf = (opp.customFields || []).find(f => f.id === ASISTIO_FIELD)
-          asistio = normalizeAsistio(cf?.fieldValueString) || 'pending'
-        }
-
-        const stageName = stages.find(s => s.id === stageId)?.name || null
-        map[opp.contactId] = { asistio, oppId: opp.id, livesLost, stageName }
+    // Count PRE-DEMO open opps in main pipeline for the summary card
+    if (main) {
+      const preDemoStg = (main.stages || []).find(s => s.name.toUpperCase().includes('PRE-DEMO'))
+      if (preDemoStg) {
+        const countRes = await ghl(
+          `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&pipeline_stage_id=${preDemoStg.id}&status=open&limit=1&page=1`
+        )
+        preDemoTotal = countRes.meta?.total || 0
       }
-    }
-    processPage(firstAll)
-
-    for (let start = 2; start <= pagesAll; start += 5) {
-      const batch = []
-      for (let p = start; p < start + 5 && p <= pagesAll; p++) {
-        batch.push(ghl(
-          `/opportunities/search?location_id=${LOCATION}&pipeline_id=${main.id}&status=open&limit=100&page=${p}`
-        ))
-      }
-      const results = await Promise.all(batch)
-      results.forEach(processPage)
     }
   } catch (e) {
     console.error('buildContactMap error:', e.message)
@@ -171,6 +176,7 @@ export default async function handler(req, res) {
         status,
         livesLost:        oppData?.livesLost || 0,
         stageName:        oppData?.stageName || null,
+        pipeline:         oppData?.pipeline || null,
         calendarId:       ev.calendarId,
       })
     }
