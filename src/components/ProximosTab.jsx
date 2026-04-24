@@ -23,12 +23,6 @@ function isSameDay(a, b) {
          a.getDate() === b.getDate()
 }
 
-const PIPELINE_FILTERS = [
-  { id: 'all',       label: 'Todos'     },
-  { id: 'principal', label: 'Principal' },
-  { id: 'webinar',   label: 'Webinar'   },
-]
-
 export default function ProximosTab({ appointments, loading, jumpFilter, livesMap = {} }) {
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d }, [])
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
@@ -36,6 +30,12 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
     const d = new Date(); d.setHours(0,0,0,0); return d
   })
   const [pipelineFilter, setPipelineFilter] = useState('all')
+
+  // Compute available pipelines from actual data
+  const pipelineOptions = useMemo(() => {
+    const names = [...new Set(appointments.map(a => a.pipeline).filter(Boolean))]
+    return [{ id: 'all', label: 'Todos' }, ...names.map(n => ({ id: n, label: n }))]
+  }, [appointments])
 
   // jumpFilter compatibility: 'hoy' → today, '7dias' → today
   useEffect(() => {
@@ -106,19 +106,21 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Pipeline filter */}
-      <div className="flex items-center gap-1.5">
-        {PIPELINE_FILTERS.map(f => (
-          <button key={f.id} onClick={() => setPipelineFilter(f.id)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              pipelineFilter === f.id
-                ? 'bg-blue-500 text-white shadow-sm'
-                : 'bg-white dark:bg-navy-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-600'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {pipelineOptions.length > 1 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {pipelineOptions.map(f => (
+            <button key={f.id} onClick={() => setPipelineFilter(f.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                pipelineFilter === f.id
+                  ? 'bg-blue-500 text-white shadow-sm'
+                  : 'bg-white dark:bg-navy-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-600'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Week navigator */}
       <div className="bg-white dark:bg-navy-700 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
