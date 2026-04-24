@@ -35,48 +35,26 @@ async function fetchEventsForUser(userId, startMs, endMs) {
 }
 
 // Build contactId -> { asistio, oppId, livesLost, stageName, pipeline } map.
-// Processes PRINCIPAL and any other pipeline (webinar, etc.).
-//
-// Status priority per opportunity:
-//   1. Stage = NO SHOW          → noshow + livesLost=1  (strongest signal)
-//   2. ¿Asistió? field filled   → trust the field value
-//   3. Stage past PRE-DEMO      → showed (advanced in pipeline = attended)
-//      (only when PRE-DEMO stage is identifiable in this pipeline)
-//   4. Stage = PRE-DEMO, no field → pending
+// Pure CRM read — no inference, no invented data.
+//   asistio   = exactly what "¿Asistió?" field says (show/noshow/no_califica), or 'pending' if empty
+//   livesLost = 1 if contact is in the NO SHOW stage (that's a real CRM stage, not inferred)
+//   stageName = stage name as-is from GHL
+//   pipeline  = pipeline name as-is from GHL
 async function processPipeline(pipeline, map, pipelineLabel) {
-  const stages      = pipeline.stages || []
-  const preDemoStg  = stages.find(s => s.name.toUpperCase().includes('PRE-DEMO') || s.name.toUpperCase().includes('PRE DEMO'))
-  const noShowStg   = stages.find(s => s.name.toUpperCase().includes('NO SHOW') || s.name.toUpperCase().includes('NOSHOW'))
-  const preDemoIdx  = stages.findIndex(s => s.id === preDemoStg?.id)
-  const postDemoIds = new Set(
-    stages
-      .filter((s, i) => i > preDemoIdx && s.id !== noShowStg?.id)
-      .map(s => s.id)
-  )
+  const stages    = pipeline.stages || []
+  const noShowStg = stages.find(s => s.name.toUpperCase().includes('NO SHOW'))
 
   const processPage = (data) => {
     for (const opp of data.opportunities || []) {
       if (!opp.contactId) continue
-      const stageId   = opp.pipelineStageId
-      const cf        = (opp.customFields || []).find(f => f.id === ASISTIO_FIELD)
-      const fromField = normalizeAsistio(cf?.fieldValueString)
+      const stageId = opp.pipelineStageId
 
-      let asistio, livesLost = 0
+      // Read ¿Asistió? field exactly as stored in CRM
+      const cf      = (opp.customFields || []).find(f => f.id === ASISTIO_FIELD)
+      const asistio = normalizeAsistio(cf?.fieldValueString) || 'pending'
 
-      if (stageId === noShowStg?.id) {
-        // 1. Contact physically moved to NO SHOW stage
-        asistio   = 'noshow'
-        livesLost = 1
-      } else if (fromField) {
-        // 2. ¿Asistió? field is filled — trust it regardless of stage
-        asistio = fromField
-      } else if (preDemoStg && postDemoIds.has(stageId)) {
-        // 3. Advanced past PRE-DEMO with no field filled → infer attended from stage
-        asistio = 'showed'
-      } else {
-        // 4. In PRE-DEMO or pipeline has no recognizable PRE-DEMO stage → pending
-        asistio = 'pending'
-      }
+      // livesLost: CRM stage "NO SHOW" is a real data point, not an inference
+      const livesLost = stageId === noShowStg?.id ? 1 : 0
 
       const stageName = stages.find(s => s.id === stageId)?.name || null
       map[opp.contactId] = { asistio, oppId: opp.id, livesLost, stageName, pipeline: pipelineLabel }
