@@ -37,25 +37,46 @@ async function fetchEventsForUser(userId, startMs, endMs) {
 // Build contactId -> { asistio, oppId, livesLost, stageName, pipeline } map.
 // Processes PRINCIPAL and any other pipeline (webinar, etc.).
 //
-// Source of truth for attendance: ALWAYS the "¿Asistió?" custom field.
-// Pipeline stage is used only to:
-//   - display the stage badge
-//   - count livesLost (contact physically moved to NO SHOW stage)
+// Status priority per opportunity:
+//   1. Stage = NO SHOW          → noshow + livesLost=1  (strongest signal)
+//   2. ¿Asistió? field filled   → trust the field value
+//   3. Stage past PRE-DEMO      → showed (advanced in pipeline = attended)
+//      (only when PRE-DEMO stage is identifiable in this pipeline)
+//   4. Stage = PRE-DEMO, no field → pending
 async function processPipeline(pipeline, map, pipelineLabel) {
-  const stages    = pipeline.stages || []
-  const noShowStg = stages.find(s => s.name.toUpperCase().includes('NO SHOW'))
+  const stages      = pipeline.stages || []
+  const preDemoStg  = stages.find(s => s.name.toUpperCase().includes('PRE-DEMO') || s.name.toUpperCase().includes('PRE DEMO'))
+  const noShowStg   = stages.find(s => s.name.toUpperCase().includes('NO SHOW') || s.name.toUpperCase().includes('NOSHOW'))
+  const preDemoIdx  = stages.findIndex(s => s.id === preDemoStg?.id)
+  const postDemoIds = new Set(
+    stages
+      .filter((s, i) => i > preDemoIdx && s.id !== noShowStg?.id)
+      .map(s => s.id)
+  )
 
   const processPage = (data) => {
     for (const opp of data.opportunities || []) {
       if (!opp.contactId) continue
-      const stageId = opp.pipelineStageId
+      const stageId   = opp.pipelineStageId
+      const cf        = (opp.customFields || []).find(f => f.id === ASISTIO_FIELD)
+      const fromField = normalizeAsistio(cf?.fieldValueString)
 
-      // ¿Asistió? custom field is the single source of truth
-      const cf      = (opp.customFields || []).find(f => f.id === ASISTIO_FIELD)
-      const asistio = normalizeAsistio(cf?.fieldValueString) || 'pending'
+      let asistio, livesLost = 0
 
-      // livesLost: contact was physically moved to NO SHOW stage in GHL
-      const livesLost = stageId === noShowStg?.id ? 1 : 0
+      if (stageId === noShowStg?.id) {
+        // 1. Contact physically moved to NO SHOW stage
+        asistio   = 'noshow'
+        livesLost = 1
+      } else if (fromField) {
+        // 2. ¿Asistió? field is filled — trust it regardless of stage
+        asistio = fromField
+      } else if (preDemoStg && postDemoIds.has(stageId)) {
+        // 3. Advanced past PRE-DEMO with no field filled → infer attended from stage
+        asistio = 'showed'
+      } else {
+        // 4. In PRE-DEMO or pipeline has no recognizable PRE-DEMO stage → pending
+        asistio = 'pending'
+      }
 
       const stageName = stages.find(s => s.id === stageId)?.name || null
       map[opp.contactId] = { asistio, oppId: opp.id, livesLost, stageName, pipeline: pipelineLabel }
