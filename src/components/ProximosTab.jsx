@@ -30,6 +30,7 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
     const d = new Date(); d.setHours(0,0,0,0); return d
   })
   const [pipelineFilter, setPipelineFilter] = useState('all')
+  const [stageFilter, setStageFilter] = useState('all')
 
   // Friendly label: strip leading "N-" prefix from GHL pipeline names
   function friendlyLabel(name) {
@@ -60,18 +61,34 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
     })
   }, [weekStart])
 
+  function isPreDemoStage(a) {
+    const s = (a.stageName || '').toUpperCase()
+    return s.includes('PRE') && s.includes('DEMO')
+  }
+
+  function isDemoStage(a) {
+    const s = (a.stageName || '').toUpperCase()
+    return !isPreDemoStage(a) && (s.includes('DEMO') || s.includes('NUTRICI'))
+  }
+
   const filteredByPipeline = useMemo(() =>
     pipelineFilter === 'all'
       ? appointments
       : appointments.filter(a => a.pipeline === pipelineFilter),
   [appointments, pipelineFilter])
 
+  const filteredByStage = useMemo(() => {
+    if (stageFilter === 'predemo') return filteredByPipeline.filter(isPreDemoStage)
+    if (stageFilter === 'demo')    return filteredByPipeline.filter(isDemoStage)
+    return filteredByPipeline
+  }, [filteredByPipeline, stageFilter])
+
   const { active, cancelled } = useMemo(() => {
     const from = new Date(selectedDay)
     const to   = new Date(selectedDay)
     to.setHours(23, 59, 59, 999)
 
-    const inRange = filteredByPipeline.filter(a => {
+    const inRange = filteredByStage.filter(a => {
       const d = getStartTime(a)
       return d && d >= from && d <= to
     })
@@ -82,12 +99,12 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
       cancelled: inRange.filter(a => a.status === 'cancelled')
                         .sort((a, b) => new Date(a.startTime) - new Date(b.startTime)),
     }
-  }, [filteredByPipeline, selectedDay])
+  }, [filteredByStage, selectedDay])
 
   // Count appointments per day for dot indicators
   const countByDay = useMemo(() => {
     const map = {}
-    for (const a of filteredByPipeline) {
+    for (const a of filteredByStage) {
       const d = getStartTime(a)
       if (!d) continue
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
@@ -96,7 +113,7 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
       else map[key].active++
     }
     return map
-  }, [filteredByPipeline])
+  }, [filteredByStage])
 
   function countForDay(d) {
     return countByDay[`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`] || { active: 0, cancelled: 0 }
@@ -190,10 +207,29 @@ export default function ProximosTab({ appointments, loading, jumpFilter, livesMa
         </div>
       </div>
 
-      {/* Day header + count */}
+      {/* Day header + stage filter + count */}
       {!loading && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">{dayLabel}</p>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">{dayLabel}</p>
+            <div className="flex items-center gap-1">
+              {[
+                { id: 'all',     label: 'Todos' },
+                { id: 'predemo', label: 'Pre Demo' },
+                { id: 'demo',    label: 'Demo' },
+              ].map(f => (
+                <button key={f.id} onClick={() => setStageFilter(f.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                    stageFilter === f.id
+                      ? 'bg-violet-500 text-white shadow-sm'
+                      : 'bg-white dark:bg-navy-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-violet-300 dark:hover:border-violet-600'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {active.length} confirmado{active.length !== 1 ? 's' : ''}
             {cancelled.length > 0 && <span className="ml-2 text-slate-400">· {cancelled.length} cancelado{cancelled.length !== 1 ? 's' : ''}</span>}

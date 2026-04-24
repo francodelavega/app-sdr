@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-const REFRESH_MS = 15 * 60 * 1000
+const REFRESH_MS = 60 * 1000
 
 async function fetchJSON(url) {
   const res = await fetch(url)
