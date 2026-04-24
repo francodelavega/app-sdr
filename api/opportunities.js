@@ -60,9 +60,12 @@ async function processPipeline(pipeline, map, pipelineLabel) {
       if (stageId === noShowStg?.id) {
         asistio   = 'noshow'
         livesLost = 1
-      } else if (postDemoIds.has(stageId)) {
+      } else if (preDemoStg && postDemoIds.has(stageId)) {
+        // Only treat as 'showed' when we found a PRE-DEMO stage in this pipeline.
+        // Without it, preDemoIdx = -1 → every stage would be in postDemoIds → false positives.
         asistio = 'showed'
       } else {
+        // PRE-DEMO stage, unrecognized pipeline structure, or custom field is source of truth
         const cf = (opp.customFields || []).find(f => f.id === ASISTIO_FIELD)
         asistio = normalizeAsistio(cf?.fieldValueString) || 'pending'
       }
