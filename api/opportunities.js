@@ -102,8 +102,8 @@ async function buildContactMap() {
     const webinar = pipelines.find(p => p.name.toUpperCase().includes('WEBINAR'))
 
     const tasks = []
-    if (main)    tasks.push(processPipeline(main,    map, 'principal'))
-    if (webinar) tasks.push(processPipeline(webinar, map, 'webinar'))
+    if (main)    tasks.push(processPipeline(main,    map, main.name))
+    if (webinar) tasks.push(processPipeline(webinar, map, webinar.name))
     await Promise.all(tasks)
 
     // Count PRE-DEMO open opps in main pipeline for the summary card
