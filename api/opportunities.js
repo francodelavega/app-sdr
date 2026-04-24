@@ -101,9 +101,11 @@ async function buildContactMap() {
     const main    = pipelines.find(p => p.id === 'MPUIAQq3Y5vZx8HZvvfC' || p.name.toUpperCase().includes('PRINCIPAL'))
     const webinar = pipelines.find(p => p.name.toUpperCase().includes('WEBINAR'))
 
-    const tasks = []
-    if (main)    tasks.push(processPipeline(main,    map, main.name))
-    if (webinar) tasks.push(processPipeline(webinar, map, webinar.name))
+    // Process main pipeline first, then ALL other pipelines (webinar, etc.)
+    const others = pipelines.filter(p => p.id !== main?.id)
+    const tasks  = []
+    if (main) tasks.push(processPipeline(main, map, main.name))
+    for (const p of others) tasks.push(processPipeline(p, map, p.name))
     await Promise.all(tasks)
 
     // Count PRE-DEMO open opps in main pipeline for the summary card

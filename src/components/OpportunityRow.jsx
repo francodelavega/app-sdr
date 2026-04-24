@@ -25,6 +25,15 @@ function fmt(d) {
   })
 }
 
+function pipelineBadge(name) {
+  if (!name) return null
+  const n = name.toUpperCase()
+  if (n.includes('WEBINAR')) return { label: 'Webinar', color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' }
+  if (n.includes('PRINCIPAL')) return { label: 'Principal', color: 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400' }
+  // fallback: first word of pipeline name
+  return { label: name.split(' ')[0], color: 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400' }
+}
+
 // Friendly label for pipeline stage name coming from GHL
 function stageLabel(stageName) {
   if (!stageName) return null
@@ -48,6 +57,7 @@ export default function AppointmentRow({ appt, showOutcome = false, showStage = 
   const isStale   = isPast && (appt.status === 'noshow' || appt.status === 'cancelled') &&
                     (now - date) > 3 * 86_400_000
   const stage     = showStage ? stageLabel(appt.stageName) : null
+  const pipeline  = pipelineBadge(appt.pipeline)
 
   return (
     <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:shadow-md ${
@@ -80,6 +90,11 @@ export default function AppointmentRow({ appt, showOutcome = false, showStage = 
             >
               <span className="text-base leading-none">💀</span>
               <span>{livesLost}</span>
+            </span>
+          )}
+          {pipeline && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${pipeline.color}`}>
+              {pipeline.label}
             </span>
           )}
           {stage && (
