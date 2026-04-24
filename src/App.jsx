@@ -9,6 +9,7 @@ import SummaryCards from './components/SummaryCards'
 import ProximosTab from './components/ProximosTab'
 import PasadoTab from './components/PasadoTab'
 import ResumenTab from './components/ResumenTab'
+import NextDemoCountdown from './components/NextDemoCountdown'
 
 export default function App() {
   const { dark, toggle }                      = useTheme()
@@ -90,6 +91,8 @@ export default function App() {
           loading={loading}
           onCardClick={handleCardClick}
         />
+
+        {!loading && <NextDemoCountdown appointments={appointments} />}
 
         {activeTab === 'proximos' && (
           <ProximosTab appointments={appointments} loading={loading} jumpFilter={proximosFilter} livesMap={livesMap} />
