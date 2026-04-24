@@ -5,17 +5,23 @@ import LoadingSkeleton from './LoadingSkeleton'
 
 export default function ResumenTab({ appointments, preDemoTotal, loading }) {
   const { byComercial, todayAppts, staleAppts } = useMemo(() => {
-    const now     = new Date()
-    const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999)
+    const now          = new Date()
+    const todayStart   = new Date(now); todayStart.setHours(0, 0, 0, 0)
+    const todayEnd     = new Date(now); todayEnd.setHours(23, 59, 59, 999)
+    const thirtyAgo    = new Date(now.getTime() - 30 * 86_400_000)
 
     const counts = {}
     const today  = []
     const stale  = []
 
     for (const a of appointments) {
-      counts[a.comercial] = (counts[a.comercial] || 0) + 1
       const d = getStartTime(a)
-      if (d && d >= now && d <= todayEnd) today.push(a)
+      // Only count last 30 days for the bar chart
+      if (d && d >= thirtyAgo && d <= now) {
+        counts[a.comercial] = (counts[a.comercial] || 0) + 1
+      }
+      // All of today (past + future)
+      if (d && d >= todayStart && d <= todayEnd) today.push(a)
       if ((a.status === 'noshow' || a.status === 'cancelled') && d && (now - d) > 3 * 86_400_000) {
         stale.push(a)
       }
