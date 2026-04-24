@@ -148,11 +148,12 @@ export default async function handler(req, res) {
       //     cancelled/invalid → 'cancelled' (actually cancelled, not just rescheduled)
       //     otherwise         → 'confirmed'
       let status
-      if (apptSt === 'cancelled' || apptSt === 'invalid') {
-        // Calendar says cancelled → always cancelled, past or future
+      if (!isPast && (apptSt === 'cancelled' || apptSt === 'invalid')) {
+        // Only trust 'cancelled' for future appointments.
+        // Past/in-progress events marked cancelled in GHL are often rescheduled originals —
+        // hiding them would make real demos disappear. Use ¿Asistió? field instead.
         status = 'cancelled'
       } else if (isPast) {
-        // Past and not cancelled → read ¿Asistió? field from CRM
         status = oppData?.asistio || 'pending'
       } else {
         status = 'confirmed'
